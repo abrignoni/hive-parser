@@ -49,8 +49,9 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn('Frames      7 on disk', text)
         self.assertIn('Live keys   4', text)
-        self.assertIn('Superseded  1', text)
-        self.assertIn('Deletions   1', text)
+        self.assertIn('Overwritten 1', text)
+        self.assertIn('Removed     1', text)
+        self.assertIn('Deletions   1 tombstone', text)
         self.assertIn('"system"', text)        # the superseded value is shown
         self.assertIn('"dark"', text)
 

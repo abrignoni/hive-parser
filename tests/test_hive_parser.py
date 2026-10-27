@@ -226,6 +226,35 @@ class TestHistory(HiveTest):
                      frame('k', v_str('c')), frame('j', v_str('x')))
         self.assertEqual(superseded_counts(read_frames(p)), {'k': 2})
 
+    def test_displaced_frames_are_split_by_what_displaced_them(self):
+        # "replaced" and "removed" are different findings. A count that merges
+        # them reports the first when the truth is the second.
+        p = self.box(frame('a', v_str('one')), frame('a', v_str('two')),
+                     frame('b', v_str('keep')), frame('b'))
+        overwritten, removed = hive_parser.displaced_counts(read_frames(p))
+        self.assertEqual(overwritten, 1)   # a: 'one' replaced by 'two'
+        self.assertEqual(removed, 1)       # b: 'keep' removed by the deletion
+
+    def test_every_frame_is_accounted_for(self):
+        # live + overwritten + removed + tombstones must equal the frame count,
+        # or the summary is silent about recoverable content.
+        p = self.box(frame('a', v_str('one')), frame('a', v_str('two')),
+                     frame('b', v_str('keep')), frame('b'),
+                     frame('c', v_str('live')))
+        frames = read_frames(p)
+        overwritten, removed = hive_parser.displaced_counts(frames)
+        tombstones = sum(1 for f in frames if f['deleted'])
+        self.assertEqual(
+            len(live_entries(frames)) + overwritten + removed + tombstones,
+            len(frames))
+
+    def test_a_delete_does_not_count_as_an_overwrite(self):
+        p = self.box(*[frame(f'k{i}', v_str('v')) for i in range(5)],
+                     frame('k0'), frame('k1'))
+        overwritten, removed = hive_parser.displaced_counts(read_frames(p))
+        self.assertEqual(overwritten, 0)
+        self.assertEqual(removed, 2)
+
     def test_a_deletion_is_a_frame_with_no_value(self):
         frames = read_frames(self.box(frame('k', v_str('live')), frame('k')))
         self.assertEqual(len(frames), 2)

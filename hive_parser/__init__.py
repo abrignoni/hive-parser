@@ -70,6 +70,7 @@ __all__ = [
     'HiveObject', 'HiveDateTime', 'HiveSet', 'HiveListRef', 'HiveRaw',
     'HiveError', 'looks_encrypted', 'superseded_counts',
     'read_frames', 'live_entries', 'hive_entries', 'read_value',
+    'displaced_counts',
     'type_name', 'RESERVED_TYPE_IDS',
 ]
 
@@ -563,6 +564,38 @@ def superseded_counts(frames):
             out[key] = out.get(key, 0) + 1
         seen[key] = True
     return out
+
+
+def displaced_counts(frames):
+    """Value frames that are no longer live, split by what displaced them.
+
+    Returns ``(overwritten, removed)``. A value frame is *overwritten* when a
+    later frame writes that key again, and *removed* when a later frame deletes
+    it. The two are different findings: "the value was replaced" and "the value
+    was removed" mean different things in a report, and a count that merges them
+    hands the reader the first when the truth is the second.
+
+    Both are still in the file and still readable. They are the content a live
+    read drops.
+    """
+    by_key = {}
+    for index, frame in enumerate(frames):
+        if (frame['key'] is None or not frame['crc_ok']
+                or (frame['error'] is not None and not frame['deleted'])):
+            continue
+        by_key.setdefault(frame['key'], []).append((index, frame))
+
+    overwritten = removed = 0
+    for runs in by_key.values():
+        for position, (_, frame) in enumerate(runs):
+            if frame['deleted']:
+                continue
+            following = runs[position + 1:]
+            if not following:
+                continue                      # still the live value
+            overwritten += not following[0][1]['deleted']
+            removed += following[0][1]['deleted']
+    return overwritten, removed
 
 
 def hive_entries(path, carve=False):

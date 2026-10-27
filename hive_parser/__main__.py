@@ -13,8 +13,8 @@ import struct
 import sys
 
 from . import (HiveDateTime, HiveListRef, HiveObject, HiveSet, KEY_UTF8,
-               __version__, live_entries, looks_encrypted, read_frames,
-               superseded_counts, type_name)
+               __version__, displaced_counts, live_entries, looks_encrypted,
+               read_frames, superseded_counts, type_name)
 
 
 def _short(value, width=58):
@@ -62,17 +62,20 @@ def _targets(path):
 
 def _summary(path, frames, out):
     live = live_entries(frames)
-    superseded = sum(superseded_counts(frames).values())
+    overwritten, removed = displaced_counts(frames)
     deleted = sum(1 for f in frames if f['deleted'])
     bad = sum(1 for f in frames if not f['crc_ok'])
     errs = sum(1 for f in frames if f['error'])
     print(f'File        {path}', file=out)
     print(f'Frames      {len(frames)} on disk', file=out)
     print(f'Live keys   {len(live)}   (what the app itself would read back)', file=out)
-    if superseded:
-        print(f'Superseded  {superseded} frame(s) hold values that were later '
-              f'overwritten', file=out)
-    print(f'Deletions   {deleted}', file=out)
+    if overwritten:
+        print(f'Overwritten {overwritten} frame(s) hold a value the app later '
+              f'replaced', file=out)
+    if removed:
+        print(f'Removed     {removed} frame(s) hold a value the app later '
+              f'deleted', file=out)
+    print(f'Deletions   {deleted} tombstone(s)', file=out)
     print(f'CRC         {len(frames) - bad} valid, {bad} failed', file=out)
     if errs:
         print(f'Unreadable  {errs} value(s); the rest of the box still reads',
