@@ -534,7 +534,10 @@ def live_entries(frames):
     """
     out = {}
     for frame in frames:
-        if frame['key'] is None or frame['error'] is not None:
+        # A frame whose checksum failed is not trustworthy, so its value is not
+        # live data however well it happened to parse.
+        if (frame['key'] is None or frame['error'] is not None
+                or not frame['crc_ok']):
             continue
         if frame['deleted']:
             out.pop(frame['key'], None)
@@ -548,7 +551,8 @@ def superseded_counts(frames):
     seen, out = {}, {}
     for frame in frames:
         key = frame['key']
-        if key is None or frame['error'] is not None or frame['deleted']:
+        if (key is None or frame['error'] is not None or frame['deleted']
+                or not frame['crc_ok']):
             continue
         if key in seen:
             out[key] = out.get(key, 0) + 1

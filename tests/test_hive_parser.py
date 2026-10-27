@@ -191,6 +191,16 @@ class TestFrameBasics(HiveTest):
         self.assertEqual([f['key'] for f in frames], ['a', 'b'])
         self.assertFalse(frames[-1]['crc_ok'])
 
+    def test_a_frame_that_failed_its_crc_is_not_live_data(self):
+        # It is reported, so an examiner sees it, but its value is unverified
+        # and must not be published as what the app would read.
+        corrupt = bytearray(frame('b', v_str('two')))
+        corrupt[-1] ^= 1
+        frames = read_frames(self.box(frame('a', v_str('one')), bytes(corrupt)))
+        self.assertEqual([f['key'] for f in frames], ['a', 'b'])
+        self.assertFalse(frames[1]['crc_ok'])
+        self.assertEqual(live_entries(frames), {'a': 'one'})
+
     def test_an_empty_box_reads_as_empty_not_as_an_error(self):
         p = self.box(b'')
         self.assertEqual(read_frames(p), [])
